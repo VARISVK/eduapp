@@ -1,4 +1,4 @@
-import { questions } from './data/questions.js';
+import { questionPools } from './data/questions.js';
 import { supabase } from './lib/supabase.js';
 
 // State Management
@@ -19,6 +19,7 @@ let state = {
     },
     buddy: null,
     currentQuestionIndex: 0,
+    currentQuestions: [],
     timer: null,
     timeLeft: 10,
     isAnswered: false,
@@ -145,7 +146,7 @@ function startMatchmaking() {
     
     setTimeout(() => {
         statusText.textContent = "Buddy Found!";
-        subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong> (${state.buddy.tag})`;
+        subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong>`;
     }, 1500);
 
     setTimeout(() => {
@@ -155,6 +156,14 @@ function startMatchmaking() {
 
 // --- Quiz Logic ---
 function startQuiz() {
+    const paper = state.user.paper;
+    // FM and AFM use the same pool
+    if (paper === 'FM' || paper === 'AFM') {
+        state.currentQuestions = questionPools.FM;
+    } else {
+        state.currentQuestions = questionPools.TX;
+    }
+    
     showView('quiz');
     renderQuestion();
 }
@@ -166,7 +175,7 @@ function renderQuestion() {
     state.buddy.status = 'Thinking...';
     state.timeLeft = 10;
     
-    const question = questions[state.currentQuestionIndex];
+    const question = state.currentQuestions[state.currentQuestionIndex];
     const container = document.getElementById('question-container');
     container.innerHTML = '';
     
@@ -176,8 +185,8 @@ function renderQuestion() {
     container.classList.add('question-slide');
 
     // Update Counter & Progress
-    document.getElementById('question-counter').textContent = `Question ${state.currentQuestionIndex + 1}/${questions.length}`;
-    document.documentElement.style.setProperty('--progress', `${((state.currentQuestionIndex + 1) / questions.length) * 100}%`);
+    document.getElementById('question-counter').textContent = `Question ${state.currentQuestionIndex + 1}/${state.currentQuestions.length}`;
+    document.documentElement.style.setProperty('--progress', `${((state.currentQuestionIndex + 1) / state.currentQuestions.length) * 100}%`);
 
     // Question Text
     const qText = document.createElement('h2');
@@ -283,7 +292,7 @@ function handleAnswer(choiceId, element) {
     if (state.isAnswered) return;
     state.isAnswered = true;
 
-    const question = questions[state.currentQuestionIndex];
+    const question = state.currentQuestions[state.currentQuestionIndex];
     let isCorrect = (choiceId.toString().toLowerCase() === question.answer.toString().toLowerCase());
 
     if (isCorrect) {
@@ -304,7 +313,7 @@ function handleCategorizationAnswer(choices) {
     if (state.isAnswered) return;
     state.isAnswered = true;
 
-    const question = questions[state.currentQuestionIndex];
+    const question = state.currentQuestions[state.currentQuestionIndex];
     let correctCount = 0;
     question.items.forEach(item => {
         if (choices[item.id] === item.answer) correctCount++;
@@ -338,7 +347,7 @@ function nextQuestion() {
     
     setTimeout(() => {
         state.currentQuestionIndex++;
-        if (state.currentQuestionIndex < questions.length) {
+        if (state.currentQuestionIndex < state.currentQuestions.length) {
             renderQuestion();
         } else {
             finishQuiz();
@@ -373,7 +382,7 @@ function renderBuddy() {
             <div class="comp-info">
                 <span class="comp-name">
                     ${player.name || 'You'} 
-                    ${!player.isUser ? `<span class="player-tag">${player.tag}</span>` : `<span class="user-details">(${state.user.paper} | ${state.user.lastScore}% | ${state.user.institute})</span>`}
+                    ${!player.isUser ? '' : `<span class="user-details">(${state.user.paper} | ${state.user.lastScore}% | ${state.user.institute})</span>`}
                 </span>
                 <span class="comp-status">${player.isUser ? (state.isAnswered ? 'Answered' : 'Thinking...') : player.status}</span>
             </div>
