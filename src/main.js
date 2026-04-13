@@ -53,8 +53,8 @@ document.getElementById('onboarding-form').addEventListener('submit', async (e) 
     state.user.paper = document.getElementById('current-paper').value;
     state.user.lastScore = Number(document.getElementById('last-score').value) || 0;
     state.user.institute = document.getElementById('institute').value;
-    state.user.gender = document.querySelector('input[name="gender"]:checked').value;
-    state.user.avatar = state.user.gender === 'male' ? '/avatars/male2.png' : '/avatars/female1.png';
+    state.user.gender = 'unspecified';
+    state.user.avatar = '/avatars/male2.png';
     
     try {
         const { data, error } = await supabase
