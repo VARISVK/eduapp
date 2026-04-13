@@ -112,8 +112,14 @@ function setupBuddy() {
         { name: 'Liyon', avatar: '/avatars/male3.png', skillLevel: 0.75 }
     ];
 
-    // Priority: Opposite Gender
-    const pool = state.user.gender === 'male' ? femalePool : malePool;
+    // Selection Pool
+    let pool = [];
+    if (state.user.gender === 'unspecified') {
+        pool = [...femalePool, ...malePool];
+    } else {
+        pool = state.user.gender === 'male' ? femalePool : malePool;
+    }
+    
     const selected = pool[Math.floor(Math.random() * pool.length)];
     
     // Simulate "Real person" vs "Bot"
