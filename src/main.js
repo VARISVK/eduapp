@@ -21,7 +21,7 @@ let state = {
     currentQuestionIndex: 0,
     currentQuestions: [],
     timer: null,
-    timeLeft: 10,
+    timeLeft: 108,
     isAnswered: false,
     botActions: []
 };
@@ -173,7 +173,7 @@ function renderQuestion() {
     state.user.lastAnswerStatus = null;
     state.buddy.lastAnswerStatus = null;
     state.buddy.status = 'Thinking...';
-    state.timeLeft = 10;
+    state.timeLeft = 108;
     
     const question = state.currentQuestions[state.currentQuestionIndex];
     const container = document.getElementById('question-container');
@@ -332,7 +332,7 @@ function handleCategorizationAnswer(choices) {
 }
 
 function calculatePoints() {
-    return Math.round(1000 + (state.timeLeft / 10) * 500);
+    return Math.round(1000 + (state.timeLeft / 108) * 500);
 }
 
 function checkBothAnswered() {
@@ -404,14 +404,14 @@ function simulateBuddy() {
     state.botActions.forEach(timeout => clearTimeout(timeout));
     state.botActions = [];
 
-    const thinkingTime = (Math.random() * 20 + 5) * 1000;
+    const thinkingTime = (Math.random() * 80 + 10) * 1000;
     
     const action = setTimeout(() => {
         const isCorrect = Math.random() < state.buddy.skillLevel;
         if (isCorrect) {
             state.buddy.lastAnswerStatus = 'correct';
-            const botTimeLeft = Math.max(0, 10 - (thinkingTime / 1000));
-            state.buddy.score += Math.round(1000 + (botTimeLeft / 10) * 500);
+            const botTimeLeft = Math.max(0, 108 - (thinkingTime / 1000));
+            state.buddy.score += Math.round(1000 + (botTimeLeft / 108) * 500);
         } else {
             state.buddy.lastAnswerStatus = 'wrong';
             state.buddy.score -= 500;
@@ -442,7 +442,7 @@ function startTimer() {
     state.timer = setInterval(() => {
         state.timeLeft -= 1;
         text.textContent = state.timeLeft;
-        const offset = circumference - (state.timeLeft / 10) * circumference;
+        const offset = circumference - (state.timeLeft / 108) * circumference;
         circle.style.strokeDashoffset = offset;
 
         if (state.timeLeft <= 0) {
