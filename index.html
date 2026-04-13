@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACCA Study Buddy | Premium Quiz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Onboarding View -->
+        <section id="onboarding-view" class="view active">
+            <div class="card glass">
+                <h1 class="title">ACCA Study Buddy</h1>
+                <p class="subtitle">Ace your taxation exam with a companion.</p>
+                <form id="onboarding-form">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="username">Your Name</label>
+                            <input type="text" id="username" placeholder="Enter your name" required>
+                        </div>
+                        <div class="field">
+                            <label for="phone">Phone Number</label>
+                            <input type="tel" id="phone" placeholder="e.g. +44... (including country code)" required>
+                        </div>
+                        <div class="field">
+                            <label for="current-paper">Current ACCA Paper</label>
+                            <select id="current-paper" required>
+                                <option value="" disabled selected>Select paper</option>
+                                <option value="BT">Business and Technology (BT)</option>
+                                <option value="MA">Management Accounting (MA)</option>
+                                <option value="FA">Financial Accounting (FA)</option>
+                                <option value="LW">Corporate and Business Law (LW)</option>
+                                <option value="PM">Performance Management (PM)</option>
+                                <option value="TX">Taxation (TX)</option>
+                                <option value="FR">Financial Reporting (FR)</option>
+                                <option value="AA">Audit and Assurance (AA)</option>
+                                <option value="FM">Financial Management (FM)</option>
+                                <option value="SBR">Strategic Business Reporting (SBR)</option>
+                                <option value="SBL">Strategic Business Leader (SBL)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="last-score">Last Paper Score (%)</label>
+                            <input type="number" id="last-score" value="0" min="0" max="100">
+                        </div>
+                        <div class="field">
+                            <label for="institute">Institute Name</label>
+                            <input type="text" id="institute" placeholder="Enter institute" required>
+                        </div>
+                        <div class="field">
+                            <label>Your Gender</label>
+                            <div class="gender-options">
+                                <label class="gender-radio">
+                                    <input type="radio" name="gender" value="male" required>
+                                    <span>Male</span>
+                                </label>
+                                <label class="gender-radio">
+                                    <input type="radio" name="gender" value="female">
+                                    <span>Female</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn primary">Find a Buddy</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Matchmaking View -->
+        <section id="matchmaking-view" class="view">
+            <div class="card matchmaking-card">
+                <div class="radar-container">
+                    <div class="radar"></div>
+                    <div class="user-ping"></div>
+                </div>
+                <h2>Finding your study buddy...</h2>
+                <p>Matching you with a taxation expert.</p>
+            </div>
+        </section>
+
+        <!-- Quiz View -->
+        <section id="quiz-view" class="view">
+            <header class="quiz-header">
+                <div class="header-main">
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                        <span id="question-counter">Question 1/30</span>
+                    </div>
+                    <div class="header-scores">
+                        <div class="score-badge user">
+                            <span class="label">YOU</span>
+                            <span class="val" id="user-score-header">0</span>
+                        </div>
+                        <div class="score-badge buddy">
+                            <span class="label">BUDDY</span>
+                            <span class="val" id="buddy-score-header">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="timer-container" id="timer-container">
+                    <svg class="timer-svg" viewBox="0 0 100 100">
+                        <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                        <circle class="timer-progress" cx="50" cy="50" r="45" id="timer-circle"></circle>
+                    </svg>
+                    <span id="timer-text">30</span>
+                </div>
+            </header>
+
+            <main class="quiz-main">
+                <div id="question-container" class="question-container">
+                    <!-- Questions will be injected here -->
+                </div>
+
+                <aside class="buddy-sidebar">
+                    <div class="card leaderboard-card">
+                        <h3 class="sidebar-title">Study Room</h3>
+                        <div id="competitors-list" class="competitors-list">
+                            <!-- Competitors will follow here -->
+                        </div>
+                    </div>
+                </aside>
+            </main>
+        </section>
+
+        <!-- Results View -->
+        <section id="results-view" class="view">
+            <div class="card results-card">
+                <h1>Quiz Completed!</h1>
+                <div class="leaderboard" id="final-leaderboard">
+                    <!-- Results will be injected here -->
+                </div>
+                <button class="btn secondary" onclick="window.location.reload()">Try Again</button>
+            </div>
+        </section>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
