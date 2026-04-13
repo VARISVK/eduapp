@@ -1,4 +1,5 @@
 import { questions } from './data/questions.js';
+import { supabase } from './lib/supabase.js';
 
 // State Management
 let state = {
@@ -10,7 +11,9 @@ let state = {
         phone: '',
         lastScore: 0,
         institute: '',
+        gmail: '',
         score: 0,
+        supabaseId: null,
         avatar: '/avatars/male2.png',
         lastAnswerStatus: null // 'correct', 'wrong', or null
     },
@@ -37,15 +40,49 @@ function showView(viewName) {
 }
 
 // --- Onboarding ---
-document.getElementById('onboarding-form').addEventListener('submit', (e) => {
+document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button');
+    const originalText = btn.textContent;
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
     state.user.name = document.getElementById('username').value;
     state.user.phone = document.getElementById('phone').value;
+    state.user.gmail = document.getElementById('gmail').value;
     state.user.paper = document.getElementById('current-paper').value;
-    state.user.lastScore = document.getElementById('last-score').value || 0;
+    state.user.lastScore = Number(document.getElementById('last-score').value) || 0;
     state.user.institute = document.getElementById('institute').value;
     state.user.gender = document.querySelector('input[name="gender"]:checked').value;
     state.user.avatar = state.user.gender === 'male' ? '/avatars/male2.png' : '/avatars/female1.png';
+    
+    try {
+        const { data, error } = await supabase
+            .from('study_buddy_users')
+            .insert([{
+                name: state.user.name,
+                gmail: state.user.gmail,
+                phone: state.user.phone,
+                paper: state.user.paper,
+                last_score: state.user.lastScore,
+                institute: state.user.institute,
+                gender: state.user.gender,
+                final_score: 0
+            }])
+            .select();
+
+        if (error) throw error;
+        if (data && data[0]) {
+            state.user.supabaseId = data[0].id;
+        }
+    } catch (err) {
+        console.error('Error saving to Supabase:', err);
+        // We continue even if DB fails to not block user experience, 
+        // but ideally we'd show a toast here.
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
     
     setupBuddy();
     startMatchmaking();
@@ -53,18 +90,26 @@ document.getElementById('onboarding-form').addEventListener('submit', (e) => {
 
 function setupBuddy() {
     const femalePool = [
-        { name: 'Sophie', avatar: '/avatars/female1.png', skillLevel: 0.9 },
-        { name: 'Emma', avatar: '/avatars/female2.png', skillLevel: 0.75 },
-        { name: 'Olivia', avatar: '/avatars/female3.png', skillLevel: 0.65 },
-        { name: 'Isabella', avatar: '/avatars/female1.png', skillLevel: 0.85 },
-        { name: 'Mia', avatar: '/avatars/female2.png', skillLevel: 0.7 }
+        { name: 'Aadhya', avatar: '/avatars/female1.png', skillLevel: 0.9 },
+        { name: 'Suhana', avatar: '/avatars/female2.png', skillLevel: 0.75 },
+        { name: 'Sara', avatar: '/avatars/female3.png', skillLevel: 0.65 },
+        { name: 'Ananya', avatar: '/avatars/female1.png', skillLevel: 0.85 },
+        { name: 'Ziya', avatar: '/avatars/female2.png', skillLevel: 0.7 },
+        { name: 'Niya', avatar: '/avatars/female3.png', skillLevel: 0.8 },
+        { name: 'Diya', avatar: '/avatars/female1.png', skillLevel: 0.6 },
+        { name: 'Zara', avatar: '/avatars/female2.png', skillLevel: 0.95 },
+        { name: 'Elena', avatar: '/avatars/female3.png', skillLevel: 0.7 }
     ];
     const malePool = [
-        { name: 'James', avatar: '/avatars/male1.png', skillLevel: 0.9 },
-        { name: 'Leo', avatar: '/avatars/male2.png', skillLevel: 0.75 },
-        { name: 'Noah', avatar: '/avatars/male3.png', skillLevel: 0.65 },
-        { name: 'Alexander', avatar: '/avatars/male1.png', skillLevel: 0.85 },
-        { name: 'Ethan', avatar: '/avatars/male2.png', skillLevel: 0.7 }
+        { name: 'Aarav', avatar: '/avatars/male1.png', skillLevel: 0.9 },
+        { name: 'Farhan', avatar: '/avatars/male2.png', skillLevel: 0.75 },
+        { name: 'Nivin', avatar: '/avatars/male3.png', skillLevel: 0.65 },
+        { name: 'Arjun', avatar: '/avatars/male1.png', skillLevel: 0.85 },
+        { name: 'Rehan', avatar: '/avatars/male2.png', skillLevel: 0.7 },
+        { name: 'Kevin', avatar: '/avatars/male3.png', skillLevel: 0.82 },
+        { name: 'Adithya', avatar: '/avatars/male1.png', skillLevel: 0.68 },
+        { name: 'Mohammed', avatar: '/avatars/male2.png', skillLevel: 0.9 },
+        { name: 'Liyon', avatar: '/avatars/male3.png', skillLevel: 0.75 }
     ];
 
     // Priority: Opposite Gender
@@ -392,7 +437,7 @@ function startTimer() {
     }, 1000);
 }
 
-function finishQuiz() {
+async function finishQuiz() {
     showView('results');
     const finalLeaderboard = document.getElementById('final-leaderboard');
     finalLeaderboard.innerHTML = '';
@@ -414,4 +459,16 @@ function finishQuiz() {
         `;
         finalLeaderboard.appendChild(item);
     });
+
+    // Save final score to Supabase
+    if (state.user.supabaseId) {
+        try {
+            await supabase
+                .from('study_buddy_users')
+                .update({ final_score: state.user.score })
+                .eq('id', state.user.supabaseId);
+        } catch (err) {
+            console.error('Error updating final score:', err);
+        }
+    }
 }
