@@ -1,6 +1,10 @@
 import { questionPools } from './data/questions.js';
 import { supabase } from './lib/supabase.js';
 
+// Session Management
+const sessionId = crypto.randomUUID();
+let lobbyChannel = null;
+
 // State Management
 let state = {
     user: {
@@ -23,7 +27,9 @@ let state = {
     timer: null,
     timeLeft: 108,
     isAnswered: false,
-    botActions: []
+    botActions: [],
+    isMatchfound: false,
+    matchTimeout: null
 };
 
 // DOM Elements
@@ -39,6 +45,48 @@ function showView(viewName) {
     Object.values(views).forEach(v => v.classList.remove('active'));
     views[viewName].classList.add('active');
 }
+
+// --- Real-time Logic ---
+function initLobby() {
+    lobbyChannel = supabase.channel('global_lobby', {
+        config: { presence: { key: sessionId } }
+    });
+
+    lobbyChannel
+        .on('presence', { event: 'sync' }, () => {
+            const state = lobbyChannel.presenceState();
+            const count = Object.keys(state).length;
+            const counter = document.getElementById('online-count');
+            if (counter) counter.textContent = count;
+        })
+        .on('broadcast', { event: 'match-proposal' }, payload => {
+            handleMatchProposal(payload);
+        })
+        .on('broadcast', { event: 'match-accept' }, payload => {
+            handleMatchAccept(payload);
+        })
+        .on('broadcast', { event: 'score-update' }, payload => {
+            if (state.buddy && payload.sessionId === state.buddy.sessionId) {
+                state.buddy.score = payload.score;
+                state.buddy.status = payload.status;
+                state.buddy.lastAnswerStatus = payload.lastAnswerStatus;
+                updateScores();
+            }
+        })
+        .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await lobbyChannel.track({
+                    name: state.user.name || 'Anonymous',
+                    paper: state.user.paper,
+                    status: 'idle',
+                    joined_at: new Date().toISOString()
+                });
+            }
+        });
+}
+
+// Global initialization
+initLobby();
 
 // --- Onboarding ---
 document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
@@ -87,6 +135,17 @@ document.getElementById('onboarding-form').addEventListener('submit', async (e) 
     
     setupBuddy();
     startMatchmaking();
+    
+    // Update presence to searching
+    if (lobbyChannel) {
+        lobbyChannel.track({
+            name: state.user.name,
+            paper: state.user.paper,
+            status: 'searching',
+            sessionId: sessionId,
+            joined_at: new Date().toISOString()
+        });
+    }
 });
 
 function setupBuddy() {
@@ -138,20 +197,130 @@ function setupBuddy() {
 }
 
 function startMatchmaking() {
+    state.isMatchfound = false;
     showView('matchmaking');
     
-    // Update matchmaking UI with "Finding..." then "Matched!"
     const statusText = document.querySelector('#matchmaking-view h2');
     const subtitle = document.querySelector('#matchmaking-view p');
     
-    setTimeout(() => {
-        statusText.textContent = "Buddy Found!";
-        subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong>`;
-    }, 1500);
+    statusText.textContent = "Searching for real players...";
+    
+    // Look for real players immediately
+    searchForRealPlayer();
+
+    // Fallback to bot after 5 seconds
+    state.matchTimeout = setTimeout(() => {
+        if (!state.isMatchfound) {
+            statusText.textContent = "Buddy Found!";
+            subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Bot Fallback)`;
+            
+            setTimeout(() => {
+                startQuiz();
+            }, 2500);
+        }
+    }, 5000);
+}
+
+function searchForRealPlayer() {
+    const presenceState = lobbyChannel.presenceState();
+    const candidates = [];
+
+    Object.entries(presenceState).forEach(([key, presences]) => {
+        if (key === sessionId) return;
+        
+        presences.forEach(p => {
+            if (p.status === 'searching' && p.paper === state.user.paper) {
+                candidates.push({ sessionId: key, ...p });
+            }
+        });
+    });
+
+    if (candidates.length > 0) {
+        // Pick random real candidate
+        const target = candidates[Math.floor(Math.random() * candidates.length)];
+        
+        // Send proposal
+        lobbyChannel.send({
+            type: 'broadcast',
+            event: 'match-proposal',
+            payload: {
+                targetSessionId: target.sessionId,
+                senderSessionId: sessionId,
+                senderName: state.user.name,
+                senderPaper: state.user.paper
+            }
+        });
+    }
+}
+
+function handleMatchProposal(payload) {
+    if (payload.targetSessionId !== sessionId) return;
+    if (state.isMatchfound) return; // Already matched
+    if (views.matchmaking.classList.contains('active')) {
+        // Accept automatically if we are searching
+        state.isMatchfound = true;
+        if (state.matchTimeout) clearTimeout(state.matchTimeout);
+
+        // Update buddy info to the real person
+        state.buddy = {
+            id: payload.senderSessionId,
+            sessionId: payload.senderSessionId,
+            name: payload.senderName,
+            avatar: '/avatars/male1.png', // Generic for now
+            score: 0,
+            status: 'Thinking...',
+            isReal: true,
+            lastAnswerStatus: null
+        };
+
+        const statusText = document.querySelector('#matchmaking-view h2');
+        const subtitle = document.querySelector('#matchmaking-view p');
+        statusText.textContent = "Connection Established!";
+        subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Live Player)`;
+
+        // Send accept
+        lobbyChannel.send({
+            type: 'broadcast',
+            event: 'match-accept',
+            payload: {
+                targetSessionId: payload.senderSessionId,
+                senderSessionId: sessionId,
+                senderName: state.user.name
+            }
+        });
+
+        setTimeout(() => {
+            startQuiz();
+        }, 2000);
+    }
+}
+
+function handleMatchAccept(payload) {
+    if (payload.targetSessionId !== sessionId) return;
+    if (state.isMatchfound) return;
+
+    state.isMatchfound = true;
+    if (state.matchTimeout) clearTimeout(state.matchTimeout);
+
+    state.buddy = {
+        id: payload.senderSessionId,
+        sessionId: payload.senderSessionId,
+        name: payload.senderName,
+        avatar: '/avatars/female1.png', // Generic
+        score: 0,
+        status: 'Thinking...',
+        isReal: true,
+        lastAnswerStatus: null
+    };
+
+    const statusText = document.querySelector('#matchmaking-view h2');
+    const subtitle = document.querySelector('#matchmaking-view p');
+    statusText.textContent = "Connection Established!";
+    subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Live Player)`;
 
     setTimeout(() => {
         startQuiz();
-    }, 4000);
+    }, 2000);
 }
 
 // --- Quiz Logic ---
@@ -164,6 +333,17 @@ function startQuiz() {
         state.currentQuestions = questionPools.TX;
     }
     
+    // Update presence to in-game
+    if (lobbyChannel) {
+        lobbyChannel.track({
+            name: state.user.name,
+            paper: state.user.paper,
+            status: 'in-game',
+            sessionId: sessionId,
+            joined_at: new Date().toISOString()
+        });
+    }
+
     showView('quiz');
     renderQuestion();
 }
@@ -396,9 +576,25 @@ function updateScores() {
     document.getElementById('user-score-header').textContent = state.user.score;
     document.getElementById('buddy-score-header').textContent = state.buddy.score;
     renderBuddy();
+
+    // Broadcast our score if real buddy
+    if (state.buddy.isReal && lobbyChannel) {
+        lobbyChannel.send({
+            type: 'broadcast',
+            event: 'score-update',
+            payload: {
+                sessionId: sessionId,
+                score: state.user.score,
+                status: state.isAnswered ? 'Answered!' : 'Thinking...',
+                lastAnswerStatus: state.user.lastAnswerStatus
+            }
+        });
+    }
 }
 
 function simulateBuddy() {
+    if (state.buddy.isReal) return; // Don't simulate for real people
+    
     state.buddy.status = 'Thinking...';
 
     state.botActions.forEach(timeout => clearTimeout(timeout));
