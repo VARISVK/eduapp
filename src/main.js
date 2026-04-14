@@ -326,9 +326,13 @@ function handleMatchAccept(payload) {
 // --- Quiz Logic ---
 function startQuiz() {
     const paper = state.user.paper;
-    // FM and AFM use the same pool
+    // Load question pool based on paper
     if (paper === 'FM' || paper === 'AFM') {
         state.currentQuestions = questionPools.FM;
+    } else if (paper === 'PM' || paper === 'APM') {
+        state.currentQuestions = questionPools.PM;
+    } else if (paper === 'AA') {
+        state.currentQuestions = questionPools.AA;
     } else {
         state.currentQuestions = questionPools.TX;
     }
@@ -389,18 +393,47 @@ function renderQuestion() {
 }
 
 function renderMCQ(container, question) {
+    const isMulti = question.type === 'multi-select';
     const grid = document.createElement('div');
     grid.className = 'choices-grid';
+    
+    const selectedChoices = new Set();
 
     Object.entries(question.choices).forEach(([key, val]) => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn';
+        btn.dataset.key = key;
         btn.innerHTML = `<span class="choice-letter">${key}</span> <span>${val}</span>`;
-        btn.onclick = () => handleAnswer(key, btn);
+        
+        btn.onclick = () => {
+            if (state.isAnswered) return;
+            
+            if (isMulti) {
+                btn.classList.toggle('selected');
+                if (btn.classList.contains('selected')) {
+                    selectedChoices.add(key);
+                } else {
+                    selectedChoices.delete(key);
+                }
+            } else {
+                handleAnswer(key, btn);
+            }
+        };
         grid.appendChild(btn);
     });
 
     container.appendChild(grid);
+
+    if (isMulti) {
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn primary submit-multi-btn';
+        submitBtn.textContent = 'Submit Answer';
+        submitBtn.onclick = () => {
+            if (selectedChoices.size === 0) return;
+            handleAnswer(Array.from(selectedChoices).sort(), null);
+        };
+        container.appendChild(submitBtn);
+    }
 }
 
 function renderCategorization(container, question) {
@@ -473,16 +506,46 @@ function handleAnswer(choiceId, element) {
     state.isAnswered = true;
 
     const question = state.currentQuestions[state.currentQuestionIndex];
-    let isCorrect = (choiceId.toString().toLowerCase() === question.answer.toString().toLowerCase());
+    let isCorrect = false;
+
+    if (Array.isArray(question.answer)) {
+        // Multi-select comparison
+        const userAns = Array.isArray(choiceId) ? choiceId.sort() : [choiceId];
+        const correctAns = [...question.answer].sort();
+        isCorrect = JSON.stringify(userAns.map(a => a.toLowerCase())) === JSON.stringify(correctAns.map(a => a.toLowerCase()));
+    } else {
+        // Single choice comparison
+        isCorrect = (choiceId.toString().toLowerCase() === question.answer.toString().toLowerCase());
+    }
 
     if (isCorrect) {
         state.user.lastAnswerStatus = 'correct';
         state.user.score += calculatePoints();
-        if (element && element.classList.contains('choice-btn')) element.classList.add('correct');
+        if (element) element.classList.add('correct');
+        // If it was a multi-select, highlight all correct and selected ones
+        if (Array.isArray(question.answer)) {
+            const btns = document.querySelectorAll('.choice-btn');
+            btns.forEach(b => {
+                if (question.answer.includes(b.dataset.key)) b.classList.add('correct');
+            });
+        }
     } else {
         state.user.lastAnswerStatus = 'wrong';
         state.user.score -= 500;
-        if (element && element.classList.contains('choice-btn')) element.classList.add('wrong');
+        if (element) element.classList.add('wrong');
+        // Highlight correct ones
+        const btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(b => {
+            const isCorrectOption = Array.isArray(question.answer) 
+                ? question.answer.includes(b.dataset.key)
+                : b.dataset.key === question.answer;
+            
+            if (isCorrectOption) {
+                b.classList.add('correct');
+            } else if (b.classList.contains('selected') || b === element) {
+                b.classList.add('wrong');
+            }
+        });
     }
 
     updateScores();

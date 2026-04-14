@@ -509,6 +509,11 @@ select:focus {
   gap: 1rem;
 }
 
+.submit-multi-btn {
+  margin-top: 2rem;
+  width: 100%;
+}
+
 .choice-btn:hover {
   background: var(--bg-secondary);
   border-color: var(--accent-blue);
