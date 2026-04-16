@@ -21,19 +21,19 @@
                 <p class="subtitle" id="onboarding-subtitle">Ace your taxation exam with a companion.</p>
                 <form id="onboarding-form">
                     <div class="form-grid">
-                        <div class="field">
+                        <div class="field signup-only">
                             <label for="username">Your Name</label>
                             <input type="text" id="username" placeholder="Enter your name" required>
                         </div>
-                        <div class="field">
-                            <label for="gmail">Gmail ID</label>
-                            <input type="email" id="gmail" placeholder="e.g. name@gmail.com" required>
+                        <div class="field" id="identifier-field">
+                            <label for="gmail" id="identifier-label">Gmail ID</label>
+                            <input type="text" id="gmail" placeholder="e.g. name@gmail.com or mobile" required>
                         </div>
-                        <div class="field">
+                        <div class="field signup-only">
                             <label for="phone">Phone Number</label>
                             <input type="tel" id="phone" placeholder="e.g. +44... (including country code)" required>
                         </div>
-                        <div class="field">
+                        <div class="field signup-only">
                             <label for="current-paper">Current ACCA Paper</label>
                             <select id="current-paper" required>
                                 <option value="" disabled selected>Select paper</option>
@@ -53,11 +53,11 @@
                                 <option value="SBL">Strategic Business Leader (SBL)</option>
                             </select>
                         </div>
-                        <div class="field">
+                        <div class="field signup-only">
                             <label for="last-score">Last Paper Score (%)</label>
                             <input type="number" id="last-score" value="0" min="0" max="100">
                         </div>
-                        <div class="field">
+                        <div class="field signup-only">
                             <label for="institute">Institute Name</label>
                             <input type="text" id="institute" placeholder="Enter institute" required>
                         </div>
@@ -77,7 +77,12 @@
                         </div>
                         -->
                     </div>
-                    <button type="submit" class="btn primary">Find a Buddy</button>
+                    <div id="auth-error" class="error-msg" style="display: none;"></div>
+                    <button type="submit" class="btn primary" id="auth-submit">Find a Buddy</button>
+                    <div class="auth-toggle">
+                        <span id="toggle-text">Already have an account?</span>
+                        <a href="#" id="toggle-link">Login</a>
+                    </div>
                 </form>
             </div>
         </section>

@@ -147,6 +147,46 @@ body {
   }
 }
 
+.onboarding-login-mode .signup-only {
+  display: none;
+}
+
+.onboarding-login-mode .form-grid {
+  grid-template-columns: 1fr;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.auth-toggle {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.auth-toggle a {
+  color: var(--accent-red);
+  text-decoration: none;
+  font-weight: 700;
+  margin-left: 0.5rem;
+}
+
+.auth-toggle a:hover {
+  text-decoration: underline;
+}
+
+.error-msg {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--accent-error);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 0.9rem;
+  text-align: center;
+  margin-bottom: 1rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
 .field {
   display: flex;
   flex-direction: column;

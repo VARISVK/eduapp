@@ -29,7 +29,8 @@ let state = {
     isAnswered: false,
     botActions: [],
     isMatchfound: false,
-    matchTimeout: null
+    matchTimeout: null,
+    authMode: 'signup' // 'signup' or 'login'
 };
 
 // DOM Elements
@@ -82,14 +83,58 @@ function initLobby() {
 // Global initialization
 initLobby();
 
-// --- Onboarding ---
-document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
+// --- Auth Mode Toggle ---
+const toggleLink = document.getElementById('toggle-link');
+const toggleText = document.getElementById('toggle-text');
+const onboardingForm = document.getElementById('onboarding-form');
+const authSubmitBtn = document.getElementById('auth-submit');
+const identifierLabel = document.getElementById('identifier-label');
+const authError = document.getElementById('auth-error');
+
+toggleLink.addEventListener('click', (e) => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
+    state.authMode = state.authMode === 'signup' ? 'login' : 'signup';
+    
+    if (state.authMode === 'login') {
+        onboardingForm.classList.add('onboarding-login-mode');
+        toggleText.textContent = "Don't have an account?";
+        toggleLink.textContent = "Sign Up";
+        authSubmitBtn.textContent = "Login";
+        identifierLabel.textContent = "Gmail ID or Phone Number";
+        // Remove required attribute from fields that are hidden
+        onboardingForm.querySelectorAll('.signup-only input, .signup-only select').forEach(el => el.required = false);
+    } else {
+        onboardingForm.classList.remove('onboarding-login-mode');
+        toggleText.textContent = "Already have an account?";
+        toggleLink.textContent = "Login";
+        authSubmitBtn.textContent = "Find a Buddy";
+        identifierLabel.textContent = "Gmail ID";
+        // Restore required attribute
+        onboardingForm.querySelectorAll('.signup-only input, .signup-only select').forEach(el => {
+            if (el.id !== 'last-score') el.required = true;
+        });
+    }
+    authError.style.display = 'none';
+});
+
+// --- Onboarding ---
+onboardingForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    authError.style.display = 'none';
+
+    const btn = document.getElementById('auth-submit');
     const originalText = btn.textContent;
-    btn.textContent = 'Saving...';
+    btn.textContent = state.authMode === 'signup' ? 'Saving...' : 'Logging in...';
     btn.disabled = true;
 
+    if (state.authMode === 'signup') {
+        await handleSignup(btn, originalText);
+    } else {
+        await handleLogin(btn, originalText);
+    }
+});
+
+async function handleSignup(btn, originalText) {
     state.user.name = document.getElementById('username').value;
     state.user.phone = document.getElementById('phone').value;
     state.user.gmail = document.getElementById('gmail').value;
@@ -117,14 +162,59 @@ document.getElementById('onboarding-form').addEventListener('submit', async (e) 
         if (error) throw error;
         if (data && data[0]) {
             state.user.supabaseId = data[0].id;
+            proceedToMatchmaking();
         }
     } catch (err) {
         console.error('Error saving to Supabase:', err);
+        authError.textContent = "Error creating account. Please try again.";
+        authError.style.display = 'block';
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
     }
+}
+
+async function handleLogin(btn, originalText) {
+    const identifier = document.getElementById('gmail').value.trim();
     
+    try {
+        // Query by either Gmail or Phone
+        const { data, error } = await supabase
+            .from('study_buddy_users')
+            .select('*')
+            .or(`gmail.eq."${identifier}",phone.eq."${identifier}"`)
+            .maybeSingle();
+
+        if (error) throw error;
+        
+        if (data) {
+            // Populate state from retrieved user
+            state.user.supabaseId = data.id;
+            state.user.name = data.name;
+            state.user.gmail = data.gmail;
+            state.user.phone = data.phone;
+            state.user.paper = data.paper;
+            state.user.lastScore = data.last_score;
+            state.user.institute = data.institute;
+            state.user.gender = data.gender || 'unspecified';
+            state.user.avatar = data.gender === 'female' ? '/avatars/female2.png' : '/avatars/male2.png';
+            
+            proceedToMatchmaking();
+        } else {
+            authError.textContent = "Account not found. Use Gmail or Phone used during signup.";
+            authError.style.display = 'block';
+        }
+    } catch (err) {
+        console.error('Error logging in:', err);
+        authError.textContent = "Login connection failed. Please try again.";
+        authError.style.display = 'block';
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function proceedToMatchmaking() {
     updatePaperSpecificUI();
     setupBuddy();
     startMatchmaking();
@@ -138,7 +228,7 @@ document.getElementById('onboarding-form').addEventListener('submit', async (e) 
             joined_at: new Date().toISOString()
         });
     }
-});
+}
 
 function updatePaperSpecificUI() {
     const paper = state.user.paper;
