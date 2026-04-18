@@ -1,5 +1,9 @@
 import { questionPools } from './data/questions.js';
 import { supabase } from './lib/supabase.js';
+import { VoiceManager } from './lib/webrtc.js';
+
+// Global Voice Manager
+let voiceManager = null;
 
 // Session Management
 const sessionId = crypto.randomUUID();
@@ -30,7 +34,12 @@ let state = {
     botActions: [],
     isMatchfound: false,
     matchTimeout: null,
-    authMode: 'signup' // 'signup' or 'login'
+    authMode: 'signup', // 'signup' or 'login'
+    voice: {
+        isLocalSpeaking: false,
+        isRemoteSpeaking: false,
+        isMuted: false
+    }
 };
 
 // DOM Elements
@@ -76,8 +85,64 @@ function initLobby() {
                     status: 'idle',
                     joined_at: new Date().toISOString()
                 });
+                
+                // Initialize Voice Manager
+                initVoice();
             }
         });
+}
+
+function initVoice() {
+    voiceManager = new VoiceManager(lobbyChannel, sessionId, {
+        onRemoteStream: (stream) => {
+            const remoteAudio = document.getElementById('remote-audio');
+            if (remoteAudio) remoteAudio.srcObject = stream;
+        },
+        onLocalSpeaking: (isSpeaking) => {
+            if (state.voice.isLocalSpeaking !== isSpeaking) {
+                state.voice.isLocalSpeaking = isSpeaking;
+                updateVoiceUI();
+                renderBuddy();
+            }
+        },
+        onRemoteSpeaking: (isSpeaking) => {
+            if (state.voice.isRemoteSpeaking !== isSpeaking) {
+                state.voice.isRemoteSpeaking = isSpeaking;
+                renderBuddy();
+            }
+        }
+    });
+
+    const muteBtn = document.getElementById('mute-btn');
+    if (muteBtn) {
+        muteBtn.onclick = () => {
+            const isMuted = voiceManager.toggleMute();
+            state.voice.isMuted = isMuted;
+            updateVoiceUI();
+        };
+    }
+}
+
+function updateVoiceUI() {
+    const indicator = document.getElementById('local-voice-indicator');
+    const onIcon = document.getElementById('mic-on-icon');
+    const offIcon = document.getElementById('mic-off-icon');
+    const muteBtn = document.getElementById('mute-btn');
+
+    if (indicator) {
+        if (state.voice.isLocalSpeaking) indicator.classList.add('speaking');
+        else indicator.classList.remove('speaking');
+    }
+
+    if (state.voice.isMuted) {
+        onIcon.style.display = 'none';
+        offIcon.style.display = 'block';
+        muteBtn.classList.add('muted');
+    } else {
+        onIcon.style.display = 'block';
+        offIcon.style.display = 'none';
+        muteBtn.classList.remove('muted');
+    }
 }
 
 // Global initialization
@@ -430,7 +495,14 @@ function handleMatchProposal(payload) {
             }
         });
 
-        setTimeout(() => { startQuiz(); }, 2000);
+        setTimeout(async () => { 
+            if (voiceManager) {
+                await voiceManager.startLocalStream();
+                voiceManager.setupPeerConnection(payload.senderSessionId, false);
+                document.getElementById('voice-controls').style.display = 'flex';
+            }
+            startQuiz(); 
+        }, 2000);
     }
 }
 
@@ -457,7 +529,14 @@ function handleMatchAccept(payload) {
     statusText.textContent = "Connection Established!";
     subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Live Player)`;
 
-    setTimeout(() => { startQuiz(); }, 2000);
+    setTimeout(async () => { 
+        if (voiceManager) {
+            await voiceManager.startLocalStream();
+            voiceManager.setupPeerConnection(payload.senderSessionId, true);
+            document.getElementById('voice-controls').style.display = 'flex';
+        }
+        startQuiz(); 
+    }, 2000);
 }
 
 function startQuiz() {
@@ -691,8 +770,10 @@ function renderBuddy() {
         if (player.status === 'Thinking...') statusClass = 'thinking';
         if (player.lastAnswerStatus === 'correct') statusClass = 'correct';
         if (player.lastAnswerStatus === 'wrong') statusClass = 'wrong';
+        const isSpeaking = player.isUser ? state.voice.isLocalSpeaking : state.voice.isRemoteSpeaking;
+        
         item.innerHTML = `
-            <div class="comp-avatar-wrapper">
+            <div class="comp-avatar-wrapper ${isSpeaking ? 'speaking' : ''}">
                 <img src="${player.avatar}" class="comp-avatar">
                 <div class="status-dot ${statusClass}"></div>
             </div>
@@ -767,6 +848,10 @@ function startTimer() {
 }
 
 async function finishQuiz() {
+    if (voiceManager) {
+        voiceManager.stop();
+        document.getElementById('voice-controls').style.display = 'none';
+    }
     showView('results');
     const finalLeaderboard = document.getElementById('final-leaderboard');
     finalLeaderboard.innerHTML = '';
