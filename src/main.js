@@ -175,12 +175,19 @@ toggleLink.addEventListener('click', (e) => {
         authSubmitBtn.textContent = "Find a Buddy";
         identifierLabel.textContent = "Gmail ID";
         // Restore required attribute
-        onboardingForm.querySelectorAll('.signup-only input, .signup-only select').forEach(el => {
-            if (el.id !== 'last-score') el.required = true;
-        });
     }
     authError.style.display = 'none';
 });
+
+// --- Logout / Reset ---
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to exit the quiz?')) {
+            window.location.reload();
+        }
+    });
+}
 
 // --- Onboarding ---
 onboardingForm.addEventListener('submit', async (e) => {
