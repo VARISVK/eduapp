@@ -51,6 +51,7 @@ let state = {
 // DOM Elements
 const views = {
     onboarding: document.getElementById('onboarding-view'),
+    menu: document.getElementById('menu-view'),
     matchmaking: document.getElementById('matchmaking-view'),
     quiz: document.getElementById('quiz-view'),
     results: document.getElementById('results-view')
@@ -261,7 +262,7 @@ async function handleSignup(btn, originalText) {
         if (error) throw error;
         if (data && data[0]) {
             state.user.supabaseId = data[0].id;
-            proceedToMatchmaking();
+            proceedToMenu();
         }
     } catch (err) {
         console.error('Error saving to Supabase:', err);
@@ -298,7 +299,7 @@ async function handleLogin(btn, originalText) {
             state.user.gender = data.gender || 'unspecified';
             state.user.avatar = data.gender === 'female' ? '/avatars/female2.png' : '/avatars/male2.png';
             
-            proceedToMatchmaking();
+            proceedToMenu();
         } else {
             authError.textContent = "Account not found. Use Gmail or Phone used during signup.";
             authError.style.display = 'block';
@@ -313,20 +314,87 @@ async function handleLogin(btn, originalText) {
     }
 }
 
-function proceedToMatchmaking() {
+function proceedToMenu() {
     updatePaperSpecificUI();
-    setupBuddy();
-    startMatchmaking();
+    showView('menu');
     
+    // Update Menu UI
+    document.getElementById('menu-username').textContent = state.user.name;
+    document.getElementById('menu-user-paper').textContent = state.user.paper;
+    
+    // Set presence to IDLE
+    updatePresence('idle');
+
+    // Bind Menu Buttons
+    const startBtn = document.getElementById('main-play-btn');
+    startBtn.onclick = () => showChoiceMenu();
+}
+
+window.showChoiceMenu = function() {
+    document.getElementById('choice-modal').style.display = 'flex';
+};
+
+window.closeModal = function(id) {
+    document.getElementById(id).style.display = 'none';
+};
+
+// Bind Choice Options
+document.getElementById('choose-quick').onclick = () => {
+    closeModal('choice-modal');
+    startQuickMatch();
+};
+
+document.getElementById('choose-lobby').onclick = () => {
+    closeModal('choice-modal');
+    startLobbyMatch();
+};
+
+function startQuickMatch() {
+    state.isMatchfound = false;
+    showView('matchmaking');
+    document.getElementById('radar-container').style.display = 'block';
+    document.getElementById('lobby-container').style.display = 'none';
+    
+    // Update presence to SEARCHING
+    updatePresence('searching');
+    
+    // Start automated search
+    searchForRealPlayer();
+    
+    // Bot fallback after 10s
+    state.matchTimeout = setTimeout(() => {
+        if (!state.isMatchfound) {
+            document.querySelector('.radar-status').textContent = "Buddy Found!";
+            document.getElementById('radar-subtitle').innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Bot)`;
+            setTimeout(() => startQuiz(), 2000);
+        }
+    }, 10000);
+}
+
+function startLobbyMatch() {
+    showView('matchmaking');
+    document.getElementById('radar-container').style.display = 'none';
+    document.getElementById('lobby-container').style.display = 'block';
+    
+    updatePresence('searching');
+    syncLobby();
+}
+
+function updatePresence(status) {
     if (lobbyChannel) {
         lobbyChannel.track({
             name: state.user.name,
             paper: state.user.paper,
-            status: 'searching',
+            status: status,
             sessionId: sessionId,
+            avatar: state.user.avatar,
             joined_at: new Date().toISOString()
         });
     }
+}
+
+function proceedToMatchmaking() {
+    proceedToMenu();
 }
 
 function updatePaperSpecificUI() {
@@ -449,9 +517,120 @@ function setupBuddy() {
     };
 }
 
-function startMatchmaking() {
+function proceedToMenu() {
+    updatePaperSpecificUI();
+    showView('menu');
+    
+    // Update Menu UI
+    document.getElementById('menu-username').textContent = state.user.name;
+    document.getElementById('menu-user-paper').textContent = state.user.paper;
+    
+    // Set presence to IDLE
+    updatePresence('idle');
+
+    // Bind Menu Buttons
+    const startBtn = document.getElementById('main-play-btn');
+    startBtn.onclick = () => showChoiceMenu();
+}
+
+window.showChoiceMenu = function() {
+    document.getElementById('choice-modal').style.display = 'flex';
+};
+
+window.closeModal = function(id) {
+    document.getElementById(id).style.display = 'none';
+};
+
+// Bind Choice Options
+const chooseQuick = document.getElementById('choose-quick');
+if (chooseQuick) chooseQuick.onclick = () => {
+    closeModal('choice-modal');
+    startQuickMatch();
+};
+
+const chooseLobby = document.getElementById('choose-lobby');
+if (chooseLobby) chooseLobby.onclick = () => {
+    closeModal('choice-modal');
+    startLobbyMatch();
+};
+
+function startQuickMatch() {
+    state.isMatchfound = false;
     showView('matchmaking');
+    document.getElementById('radar-container').style.display = 'block';
+    document.getElementById('lobby-container').style.display = 'none';
+    
+    // Update presence to SEARCHING
+    updatePresence('searching');
+    
+    // Start automated search
+    searchForRealPlayer();
+    
+    // Bot fallback after 10s
+    state.matchTimeout = setTimeout(() => {
+        if (!state.isMatchfound) {
+            document.querySelector('.radar-status').textContent = "Buddy Found!";
+            document.getElementById('radar-subtitle').innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Bot)`;
+            setTimeout(() => startQuiz(), 2000);
+        }
+    }, 10000);
+}
+
+function startLobbyMatch() {
+    showView('matchmaking');
+    document.getElementById('radar-container').style.display = 'none';
+    document.getElementById('lobby-container').style.display = 'block';
+    
+    updatePresence('searching');
     syncLobby();
+}
+
+function updatePresence(status) {
+    if (lobbyChannel) {
+        lobbyChannel.track({
+            name: state.user.name,
+            paper: state.user.paper,
+            status: status,
+            sessionId: sessionId,
+            avatar: state.user.avatar,
+            joined_at: new Date().toISOString()
+        });
+    }
+}
+
+function searchForRealPlayer() {
+    if (!lobbyChannel) return;
+    const presenceState = lobbyChannel.presenceState();
+    const candidates = [];
+
+    Object.entries(presenceState).forEach(([id, presences]) => {
+        if (id === sessionId) return;
+        presences.forEach(p => {
+            // Target users who are IDLE or SEARCHING for the same paper
+            if ((p.status === 'idle' || p.status === 'searching') && p.paper === state.user.paper) {
+                candidates.push({ sessionId: id, ...p });
+            }
+        });
+    });
+
+    if (candidates.length > 0) {
+        const target = candidates[Math.floor(Math.random() * candidates.length)];
+        lobbyChannel.send({
+            type: 'broadcast',
+            event: 'match-proposal',
+            payload: {
+                targetId: target.sessionId,
+                senderId: sessionId,
+                senderName: state.user.name,
+                senderPaper: state.user.paper,
+                senderAvatar: state.user.avatar
+            }
+        });
+    }
+}
+
+function startMatchmaking() {
+    proceedToMenu();
 }
 
 function syncLobby() {
@@ -462,7 +641,8 @@ function syncLobby() {
     Object.entries(presenceState).forEach(([id, presences]) => {
         if (id === sessionId) return;
         presences.forEach(p => {
-            if (p.status === 'searching' || p.status === 'ready') {
+            // Show users who are IDLE or SEARCHING
+            if (p.status === 'idle' || p.status === 'searching') {
                 users.push({ sessionId: id, ...p });
             }
         });
@@ -470,6 +650,10 @@ function syncLobby() {
 
     state.lobby.onlineUsers = users;
     renderLobby();
+    
+    // Update Menu stats online count
+    const menuCount = document.getElementById('menu-online-count');
+    if (menuCount) menuCount.textContent = users.length + 1; // +1 for self
 }
 
 function renderLobby() {

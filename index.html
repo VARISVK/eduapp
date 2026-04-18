@@ -87,24 +87,81 @@
             </div>
         </section>
 
-        <!-- Matchmaking View (Lobby) -->
-        <section id="matchmaking-view" class="view">
-            <div class="card lobby-card">
-                <div class="lobby-header">
-                    <div>
-                        <h2 class="title">Live Study Lobby</h2>
-                        <p id="matchmaking-subtitle">Find a study buddy online right now.</p>
+        <!-- Menu View -->
+        <section id="menu-view" class="view">
+            <div class="card menu-card">
+                <div class="menu-header">
+                    <span class="user-welcome">Hi, <strong id="menu-username">Student</strong>! 👋</span>
+                    <span class="online-status">● Online</span>
+                </div>
+                <div class="menu-main">
+                    <div class="menu-stats">
+                        <div class="stat-box">
+                            <span class="val" id="menu-user-paper">TX</span>
+                            <span class="label">Current Paper</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="val" id="menu-online-count">0</span>
+                            <span class="label">Students Online</span>
+                        </div>
                     </div>
-                    <div class="lobby-stats">
-                        <span class="online-count">0 Players Online</span>
+                    <button id="main-play-btn" class="btn primary main-play-btn pulse">START STUDYING</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Matchmaking Choice Modal -->
+        <div id="choice-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-card glass">
+                <h3>Select Study Mode</h3>
+                <div class="choice-options">
+                    <div class="choice-option" id="choose-quick">
+                        <div class="icon">📡</div>
+                        <div class="text">
+                            <strong>Quick Match</strong>
+                            <span>Auto-scan for available buddies</span>
+                        </div>
+                    </div>
+                    <div class="choice-option" id="choose-lobby">
+                        <div class="icon">📋</div>
+                        <div class="text">
+                            <strong>Browse Lobby</strong>
+                            <span>Manually pick from online list</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div id="lobby-list" class="lobby-list">
-                    <!-- Online users will be injected here -->
-                    <div class="lobby-empty">
-                        <div class="radar-mini"></div>
-                        <p>Waiting for students to join...</p>
+                <button class="btn secondary" onclick="closeModal('choice-modal')">Maybe Later</button>
+            </div>
+        </div>
+
+        <!-- Matchmaking View -->
+        <section id="matchmaking-view" class="view">
+            <div class="card lobby-card">
+                <!-- Automated Radar View (Hidden by default) -->
+                <div id="radar-container" style="display: none;">
+                    <div class="radar-container">
+                        <div class="radar"></div>
+                        <div class="user-ping"></div>
+                    </div>
+                    <h2 class="radar-status">Scanning for buddies...</h2>
+                    <p id="radar-subtitle">Searching for real players online.</p>
+                    <button class="btn secondary" onclick="showChoiceMenu()" style="margin-top: 2rem;">Back to Lobby</button>
+                </div>
+
+                <!-- Manual Lobby View (Hidden by default) -->
+                <div id="lobby-container" style="display: none;">
+                    <div class="lobby-header">
+                        <div>
+                            <h2 class="title">Live Study Lobby</h2>
+                            <p id="matchmaking-subtitle">Find a study buddy online right now.</p>
+                        </div>
+                        <div class="lobby-stats">
+                            <span class="online-count">0 Players Online</span>
+                        </div>
+                    </div>
+                    
+                    <div id="lobby-list" class="lobby-list">
+                        <!-- Online users will be injected here -->
                     </div>
                 </div>
 
