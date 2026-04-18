@@ -606,8 +606,8 @@ function searchForRealPlayer() {
     Object.entries(presenceState).forEach(([id, presences]) => {
         if (id === sessionId) return;
         presences.forEach(p => {
-            // Target users who are IDLE or SEARCHING for the same paper
-            if ((p.status === 'idle' || p.status === 'searching') && p.paper === state.user.paper) {
+            // Target users who are IDLE or SEARCHING (anyone online)
+            if (p.status === 'idle' || p.status === 'searching') {
                 candidates.push({ sessionId: id, ...p });
             }
         });
