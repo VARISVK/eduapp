@@ -87,17 +87,64 @@
             </div>
         </section>
 
-        <!-- Matchmaking View -->
+        <!-- Matchmaking View (Lobby) -->
         <section id="matchmaking-view" class="view">
-            <div class="card matchmaking-card">
-                <div class="radar-container">
-                    <div class="radar"></div>
-                    <div class="user-ping"></div>
+            <div class="card lobby-card">
+                <div class="lobby-header">
+                    <div>
+                        <h2 class="title">Live Study Lobby</h2>
+                        <p id="matchmaking-subtitle">Find a study buddy online right now.</p>
+                    </div>
+                    <div class="lobby-stats">
+                        <span class="online-count">0 Players Online</span>
+                    </div>
                 </div>
-                <h2>Finding your study buddy...</h2>
-                <p id="matchmaking-subtitle">Matching you with a taxation expert.</p>
+                
+                <div id="lobby-list" class="lobby-list">
+                    <!-- Online users will be injected here -->
+                    <div class="lobby-empty">
+                        <div class="radar-mini"></div>
+                        <p>Waiting for students to join...</p>
+                    </div>
+                </div>
+
+                <div id="match-ready-container" class="match-ready-card glass" style="display: none;">
+                    <div class="ready-info">
+                        <div class="ready-players">
+                            <div class="ready-player" id="local-ready-player">
+                                <img src="" class="avatar">
+                                <span>You</span>
+                                <div class="ready-tag">READY</div>
+                            </div>
+                            <div class="vs-divider">VS</div>
+                            <div class="ready-player" id="remote-ready-player">
+                                <img src="" class="avatar">
+                                <span id="buddy-ready-name">Buddy</span>
+                                <div class="ready-tag" id="buddy-ready-status">WAITING</div>
+                            </div>
+                        </div>
+                        <button id="start-game-btn" class="btn primary start-game-btn" disabled>PLAY GAME</button>
+                    </div>
+                </div>
             </div>
         </section>
+
+        <!-- Invitation Modal -->
+        <div id="invite-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-card glass pulse-border">
+                <div class="modal-header">
+                    <div class="invite-icon">🤝</div>
+                    <h3>Study Invitation!</h3>
+                </div>
+                <div class="modal-body">
+                    <p><strong id="inviter-name">Someone</strong> wants to study <strong id="inviter-paper">TX</strong> with you.</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="decline-invite" class="btn secondary">Decline</button>
+                    <button id="accept-invite" class="btn primary">Accept & Connect</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Quiz View -->
         <section id="quiz-view" class="view">
@@ -115,6 +162,10 @@
                         <div class="score-badge buddy">
                             <span class="label">BUDDY</span>
                             <span class="val" id="buddy-score-header">0</span>
+                        </div>
+                        <div id="header-voice-status" class="voice-status-badge" style="display: none;">
+                            <span class="pulse-dot"></span>
+                            <span class="label">Voice ON</span>
                         </div>
                     </div>
                 </div>

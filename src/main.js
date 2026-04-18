@@ -39,6 +39,12 @@ let state = {
         isLocalSpeaking: false,
         isRemoteSpeaking: false,
         isMuted: false
+    },
+    lobby: {
+        onlineUsers: [],
+        invitation: null,
+        isReady: false,
+        buddyReady: false
     }
 };
 
@@ -64,10 +70,13 @@ function initLobby() {
 
     lobbyChannel
         .on('broadcast', { event: 'match-proposal' }, payload => {
-            handleMatchProposal(payload);
+            handleIncomingInvite(payload);
         })
         .on('broadcast', { event: 'match-accept' }, payload => {
-            handleMatchAccept(payload);
+            handleInviteAccepted(payload);
+        })
+        .on('broadcast', { event: 'match-ready' }, payload => {
+            handleBuddyReady(payload);
         })
         .on('broadcast', { event: 'score-update' }, payload => {
             if (state.buddy && payload.sessionId === state.buddy.sessionId) {
@@ -88,6 +97,17 @@ function initLobby() {
                 
                 // Initialize Voice Manager
                 initVoice();
+
+                // Start syncing lobby
+                lobbyChannel.on('presence', { event: 'sync' }, () => {
+                    syncLobby();
+                });
+                lobbyChannel.on('presence', { event: 'join' }, ({ newPresences }) => {
+                    syncLobby();
+                });
+                lobbyChannel.on('presence', { event: 'leave' }, ({ leftPresences }) => {
+                    syncLobby();
+                });
             }
         });
 }
@@ -128,10 +148,17 @@ function updateVoiceUI() {
     const onIcon = document.getElementById('mic-on-icon');
     const offIcon = document.getElementById('mic-off-icon');
     const muteBtn = document.getElementById('mute-btn');
+    const headerBadge = document.getElementById('header-voice-status');
 
     if (indicator) {
         if (state.voice.isLocalSpeaking) indicator.classList.add('speaking');
         else indicator.classList.remove('speaking');
+    }
+
+    if (headerBadge) {
+        headerBadge.style.display = voiceManager && voiceManager.localStream ? 'flex' : 'none';
+        if (state.voice.isMuted) headerBadge.style.opacity = '0.5';
+        else headerBadge.style.opacity = '1';
     }
 
     if (state.voice.isMuted) {
@@ -423,51 +450,193 @@ function setupBuddy() {
 }
 
 function startMatchmaking() {
-    state.isMatchfound = false;
     showView('matchmaking');
-    
-    const statusText = document.querySelector('#matchmaking-view h2');
-    const subtitle = document.querySelector('#matchmaking-view p');
-    
-    statusText.textContent = "Searching for real players...";
-    searchForRealPlayer();
-
-    state.matchTimeout = setTimeout(() => {
-        if (!state.isMatchfound) {
-            statusText.textContent = "Buddy Found!";
-            subtitle.innerHTML = `Matched with <strong>${state.buddy.name}</strong> (Bot Fallback)`;
-            setTimeout(() => { startQuiz(); }, 2500);
-        }
-    }, 5000);
+    syncLobby();
 }
 
-function searchForRealPlayer() {
+function syncLobby() {
+    if (!lobbyChannel) return;
     const presenceState = lobbyChannel.presenceState();
-    const candidates = [];
+    const users = [];
 
-    Object.entries(presenceState).forEach(([key, presences]) => {
-        if (key === sessionId) return;
+    Object.entries(presenceState).forEach(([id, presences]) => {
+        if (id === sessionId) return;
         presences.forEach(p => {
-            if (p.status === 'searching' && p.paper === state.user.paper) {
-                candidates.push({ sessionId: key, ...p });
+            if (p.status === 'searching' || p.status === 'ready') {
+                users.push({ sessionId: id, ...p });
             }
         });
     });
 
-    if (candidates.length > 0) {
-        const target = candidates[Math.floor(Math.random() * candidates.length)];
-        lobbyChannel.send({
-            type: 'broadcast',
-            event: 'match-proposal',
-            payload: {
-                targetSessionId: target.sessionId,
-                senderSessionId: sessionId,
-                senderName: state.user.name,
-                senderPaper: state.user.paper
-            }
+    state.lobby.onlineUsers = users;
+    renderLobby();
+}
+
+function renderLobby() {
+    const list = document.getElementById('lobby-list');
+    const count = document.querySelector('.online-count');
+    if (!list) return;
+
+    count.textContent = `${state.lobby.onlineUsers.length} Players Online`;
+
+    if (state.lobby.onlineUsers.length === 0) {
+        list.innerHTML = `
+            <div class="lobby-empty">
+                <div class="radar-mini"></div>
+                <p>Waiting for students to join...</p>
+                <button class="btn secondary" onclick="startAIQuiz()" style="margin-top: 1rem;">Study with AI Buddy</button>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = '';
+    state.lobby.onlineUsers.forEach(user => {
+        const card = document.createElement('div');
+        const isSamePaper = user.paper === state.user.paper;
+        card.className = `user-card ${isSamePaper ? 'same-paper' : ''}`;
+        card.innerHTML = `
+            <img src="${user.avatar || '/avatars/male1.png'}" class="avatar">
+            <div class="info">
+                <span class="name">${user.name}</span>
+                <span class="paper">${user.paper} ${isSamePaper ? '⭐' : ''}</span>
+                <div class="user-meta">
+                    <span class="voice-tag">🎙️ Audio Available</span>
+                </div>
+            </div>
+            <button class="btn primary invite-btn" onclick="sendInvite('${user.sessionId}')">Invite</button>
+        `;
+        list.appendChild(card);
+    });
+}
+
+window.sendInvite = function(targetId) {
+    const target = state.lobby.onlineUsers.find(u => u.sessionId === targetId);
+    if (!target) return;
+
+    lobbyChannel.send({
+        type: 'broadcast',
+        event: 'match-proposal',
+        payload: {
+            targetId: targetId,
+            senderId: sessionId,
+            senderName: state.user.name,
+            senderPaper: state.user.paper,
+            senderAvatar: state.user.avatar
+        }
+    });
+
+    // Show waiting state
+    document.getElementById('matchmaking-subtitle').textContent = `Inviting ${target.name}...`;
+};
+
+function handleIncomingInvite(payload) {
+    if (payload.targetId !== sessionId) return;
+    state.lobby.invitation = payload;
+    
+    const modal = document.getElementById('invite-modal');
+    document.getElementById('inviter-name').textContent = payload.senderName;
+    document.getElementById('inviter-paper').textContent = payload.senderPaper;
+    modal.style.display = 'flex';
+
+    document.getElementById('accept-invite').onclick = () => acceptInvite();
+    document.getElementById('decline-invite').onclick = () => {
+        modal.style.display = 'none';
+        state.lobby.invitation = null;
+    };
+}
+
+function acceptInvite() {
+    const invitation = state.lobby.invitation;
+    if (!invitation) return;
+
+    document.getElementById('invite-modal').style.display = 'none';
+
+    lobbyChannel.send({
+        type: 'broadcast',
+        event: 'match-accept',
+        payload: {
+            targetId: invitation.senderId,
+            senderId: sessionId,
+            senderName: state.user.name,
+            senderAvatar: state.user.avatar
+        }
+    });
+
+    setupStudyRoom(invitation.senderId, invitation.senderName, invitation.senderAvatar);
+}
+
+function handleInviteAccepted(payload) {
+    if (payload.targetId !== sessionId) return;
+    setupStudyRoom(payload.senderId, payload.senderName, payload.senderAvatar);
+}
+
+function setupStudyRoom(buddyId, buddyName, buddyAvatar) {
+    state.isMatchfound = true;
+    state.buddy = {
+        id: buddyId,
+        sessionId: buddyId,
+        name: buddyName,
+        avatar: buddyAvatar || '/avatars/male1.png',
+        score: 0,
+        status: 'Waiting...',
+        isReal: true,
+        lastAnswerStatus: null
+    };
+
+    // Update UI to Ready State
+    document.getElementById('lobby-list').style.display = 'none';
+    document.querySelector('.lobby-header').style.display = 'none';
+    const readyCard = document.getElementById('match-ready-container');
+    readyCard.style.display = 'block';
+
+    document.querySelector('#local-ready-player img').src = state.user.avatar;
+    document.querySelector('#remote-ready-player img').src = state.buddy.avatar;
+    document.getElementById('buddy-ready-name').textContent = state.buddy.name;
+
+    // Start Voice
+    if (voiceManager) {
+        voiceManager.startLocalStream().then(() => {
+            voiceManager.setupPeerConnection(buddyId, true);
+            document.getElementById('voice-controls').style.display = 'flex';
         });
     }
+
+    const startBtn = document.getElementById('start-game-btn');
+    startBtn.disabled = false;
+    startBtn.onclick = () => {
+        state.lobby.isReady = true;
+        document.querySelector('#local-ready-player .ready-tag').classList.add('active');
+        
+        lobbyChannel.send({
+            type: 'broadcast',
+            event: 'match-ready',
+            payload: { targetId: buddyId, senderId: sessionId }
+        });
+
+        checkBothReady();
+    };
 }
+
+function handleBuddyReady(payload) {
+    if (payload.targetId !== sessionId) return;
+    state.lobby.buddyReady = true;
+    const tag = document.getElementById('buddy-ready-status');
+    tag.textContent = 'READY';
+    tag.classList.add('active');
+    checkBothReady();
+}
+
+function checkBothReady() {
+    if (state.lobby.isReady && state.lobby.buddyReady) {
+        setTimeout(() => startQuiz(), 1000);
+    }
+}
+
+window.startAIQuiz = function() {
+    setupBuddy(); // Initialize a bot
+    startQuiz();
+};
 
 function handleMatchProposal(payload) {
     if (payload.targetSessionId !== sessionId) return;
